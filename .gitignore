@@ -1,0 +1,9 @@
+# Ignore the build directory
+build/
+
+# Ignore the build executable
+wtcc
+wtcc.exe
+
+# Ignore vscode config directory
+.vscode/
