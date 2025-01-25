@@ -41,7 +41,25 @@ struct DataVariable {
 };
 
 struct DataFunction {
+    std::string name; //name of function
     DataToken (*function)(DataToken data); //pointer to function to be executet
+};
+
+enum ObjectType {
+    OBJ_NONE = 0,
+    OBJ_NUMBER,
+    OBJ_TEXT,
+    OBJ_FUNCTION
+};
+
+struct DataObject {
+    std::string name; //name of object
+    ObjectType type; //type of object
+    union {
+        double value; //value for number type
+        char* text; //text for text type
+        DataToken (*function)(DataToken data); //function for function type
+    };
 };
 
 

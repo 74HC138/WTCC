@@ -1,14 +1,18 @@
+#include <vector>
+
 #include "types.hpp"
 #include "helper.hpp"
 #include "malloc.h"
 #include "math.h"
 
+std::vector<DataVariable> variableStorage;
+std::vector<DataFunction> functionStorage;
+std::vector<DataObject> objectStorage;
 
 DataToken TokenConstructNumber(double value) {
     DataToken returnToken = {TOKEN_NUMBER, NULL, value, OP_NONE, NULL, NULL};
     return returnToken;
 }
-
 void TokenFree(DataToken* token) {
     if (token->nextToken) TokenFree(token->nextToken);
     if (token->subToken) TokenFree(token->subToken);
@@ -18,21 +22,94 @@ void TokenFree(DataToken rootToken) {
     if (rootToken.nextToken) TokenFree(rootToken.nextToken);
     if (rootToken.subToken) TokenFree(rootToken.subToken);
 }
-
 void TokenAppendSubtoken(DataToken* base, DataToken* ext) {
     while (base->subToken != NULL) base = base->subToken;
     base->subToken = ext;
 }
 
-double VariableGet(std::string name) {
-    //TODO impliment
-    //for now just return 0
-    return 0;
+DataToken ObjectGet(std::string name) {
+    for (auto it = objectStorage.begin(); it != objectStorage.end(); it++) {
+        if (name.compare(it->name) == 0) {
+            DataToken retToken;
+            switch (it->type) {
+                case OBJ_NUMBER:
+                    retToken = TokenConstructNumber(it->value);
+                    break;
+                case OBJ_TEXT:
+                    retToken = {TOKEN_TEXT, NULL, 0, OP_NONE, NULL, it->text};
+                    break;
+                case OBJ_FUNCTION:
+                case OBJ_NONE:
+                default:
+                    //cant get a function
+                    retToken = TokenConstructNumber(0);
+            }
+            return retToken;
+        }
+    }
+    throwWarn("Object " + name + " does not exist\n");
+    return TokenConstructNumber(0);
 }
-
-DataToken FunctionCall(std::string name, DataToken data) {
-    //TODO impliment
-    //for now just return 0
+void ObjectSet(std::string name, double val) {
+    for (auto it = objectStorage.begin(); it != objectStorage.end(); it++) {
+        if (name.compare(it->name) == 0) {
+            if (it->type == OBJ_NUMBER) {
+                it->value = val;
+                return;
+            }
+            throwWarn("Object " + name + " already defined as different type!\n");
+            return;
+        }
+    }
+    DataObject obj = {.name = name, .type = OBJ_NUMBER, .value = val};
+    objectStorage.push_back(obj);
+}
+void ObjectSet(std::string name, char* text) {
+    for (auto it = objectStorage.begin(); it != objectStorage.end(); it++) {
+        if (name.compare(it->name) == 0) {
+            if (it->type == OBJ_TEXT) {
+                it->text = text;
+                return;
+            }
+            throwWarn("Object " + name + " already defined as different type\n");
+            return;
+        }
+    }
+    DataObject obj = {.name = name, .type = OBJ_TEXT, .text = text};
+    objectStorage.push_back(obj);
+}
+void ObjectSet(std::string name, DataToken (*function)(DataToken)) {
+    for (auto it = objectStorage.begin(); it != objectStorage.end(); it++) {
+        if (name.compare(it->name) == 0) {
+            if (it->type == OBJ_FUNCTION) {
+                it->function = function;
+                return;
+            }
+            throwWarn("Object " + name + " already defined as different type\n");
+            return;
+        }
+    }
+    DataObject obj = {.name = name, .type = OBJ_FUNCTION, .function = function};
+    objectStorage.push_back(obj);
+}
+ObjectType ObjectGetType(std::string name) {
+    for (auto it = objectStorage.begin(); it != objectStorage.end(); it++) {
+        if (name.compare(it->name) == 0) return it->type;
+    }
+    return OBJ_NONE;
+}
+DataToken ObjectCall(std::string name, DataToken data) {
+    for (auto it = objectStorage.begin(); it != objectStorage.end(); it++) {
+        if (name.compare(it->name) == 0) {
+            if (it->type == OBJ_FUNCTION) {
+                return it->function(data);
+            } else {
+                throwWarn("Attempted to call " + name + " a non function\n");
+                return TokenConstructNumber(0);
+            }
+        }
+    }
+    throwWarn("Object " + name + " does not exist\n");
     return TokenConstructNumber(0);
 }
 
@@ -135,7 +212,7 @@ DataToken TokenCalc(DataToken* tokenList) {
                 *current = subToken;
                 break;
             case TOKEN_VARIABLE:
-                current->value = VariableGet(tokenList->name);
+                *current = ObjectGet(tokenList->name);
                 break;
             case TOKEN_FUNCTION:
                 //if we have more then one parameter for the function we need to check if the next token
@@ -143,25 +220,25 @@ DataToken TokenCalc(DataToken* tokenList) {
 
                 if (tokenList->nextToken == NULL) {
                     //we have no arguments for the function, call it with zero argument
-                    *current = FunctionCall(tokenList->name, TokenConstructNumber(0));
+                    *current = ObjectCall(tokenList->name, TokenConstructNumber(0));
                     return rootResult;
                 } else {
                     if (tokenList->nextToken->type == TOKEN_SUBTOKEN) {
                         if (tokenList->nextToken->subToken == NULL) {
                             //sub token without subtoken...
                             throwWarn("hit sub token without sub token!\n");
-                            *current = FunctionCall(tokenList->name, TokenConstructNumber(0));
+                            *current = ObjectCall(tokenList->name, TokenConstructNumber(0));
                             break;
                         } else {
                             resultNext = TokenCalc(tokenList->nextToken->subToken);
-                            *current = FunctionCall(tokenList->name, resultNext);
+                            *current = ObjectCall(tokenList->name, resultNext);
                         }
                         tokenList = tokenList->nextToken;
                     } else {
                         resultNext = TokenCalc(tokenList->nextToken);
                         subTokenTmp = resultNext.subToken;
                         resultNext.subToken = NULL;
-                        *current = FunctionCall(tokenList->name, resultNext);
+                        *current = ObjectCall(tokenList->name, resultNext);
                         TokenAppendSubtoken(current, subTokenTmp);
                         return rootResult;
                     }
