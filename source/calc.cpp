@@ -9,16 +9,6 @@
 
 std::vector<DataObject> objectStorage;
 
-DataToken TokenConstructNumber(double value) {
-    DataToken returnToken = DataToken(0);
-    return returnToken;
-}
-void TokenFree(DataToken* token) {
-    delete token;
-}
-void TokenFree(DataToken rootToken) {
-    rootToken.~DataToken();
-}
 void TokenAppendSubtoken(DataToken* base, DataToken* ext) {
     while (base->subToken != NULL) base = base->subToken;
     base->subToken = ext;
@@ -36,6 +26,7 @@ DataToken ObjectGet(std::string name) {
                     retToken = DataToken(it->text);
                     break;
                 case OBJ_FUNCTION:
+                case OBJ_CFUNCTION:
                 case OBJ_NONE:
                 default:
                     //cant get a function
@@ -45,7 +36,7 @@ DataToken ObjectGet(std::string name) {
         }
     }
     throwWarn("Object " + name + " does not exist\n");
-    return TokenConstructNumber(0);
+    return DataToken(0);
 }
 void ObjectSet(std::string name, double val) {
     for (auto it = objectStorage.begin(); it != objectStorage.end(); it++) {
@@ -118,18 +109,18 @@ DataToken ObjectCall(std::string name, DataToken data) {
                 return TokenEval(it->function); //wtcc functions do not support parameters for now. TODO
             } else {
                 throwWarn("Attempted to call " + name + " a non function\n");
-                return TokenConstructNumber(0);
+                return DataToken(0);
             }
         }
     }
     throwWarn("Object " + name + " does not exist\n");
-    return TokenConstructNumber(0);
+    return DataToken(0);
 }
 
 //Evaluates a token chain returning the result
 //If multiples results get returned then they get returned as a linked list atached to subToken
 DataToken TokenEval(DataToken* tokenList) {
-    DataToken rootResult = TokenConstructNumber(0);
+    DataToken rootResult = DataToken(0);
     DataToken* current = &rootResult;
 
     while (true) {
@@ -139,10 +130,10 @@ DataToken TokenEval(DataToken* tokenList) {
         DataToken* subTokenTmp;
         switch (tokenList->type) {
             case TOKEN_NUMBER:
-                current->value = tokenList->value;
+                *current = DataToken(tokenList->value);
                 break;
             case TOKEN_OPERATOR:
-                resultNext = TokenConstructNumber(0);
+                resultNext = DataToken(0);
                 if (tokenList->nextToken == NULL) {
                     //token list is cut off, assume 0 and throw warning
                     throwWarn("Token list is cut off, assuming 0.\n");
@@ -204,9 +195,10 @@ DataToken TokenEval(DataToken* tokenList) {
                         break;
                 }
                 //return from here because all data is allready ingested
+                current->subToken = resultNext.subToken;
                 return rootResult;
             case TOKEN_SUBTOKEN:
-                subToken = TokenConstructNumber(0);
+                subToken = DataToken(0);
                 if (tokenList->subToken) {
                     subToken = TokenEval(tokenList->subToken);
                 } else {
@@ -221,7 +213,7 @@ DataToken TokenEval(DataToken* tokenList) {
                     } else {
                         //got something else... bad... assume 0 and contine
                         throwWarn("unexpected result from subtoken!\n");
-                        *current = TokenConstructNumber(0);
+                        *current = DataToken(0);
                         current->subToken = subToken.subToken;
                         break;
                     }
@@ -246,14 +238,14 @@ DataToken TokenEval(DataToken* tokenList) {
                         //is a subtoken, evaluate that and give all the parameters to the function
                         if (tokenList->nextToken == NULL) {
                             //we have no arguments for the function, call it with zero argument
-                            *current = ObjectCall(tokenList->name, TokenConstructNumber(0));
+                            *current = ObjectCall(tokenList->name, DataToken(0));
                             return rootResult;
                         } else {
                             if (tokenList->nextToken->type == TOKEN_SUBTOKEN) {
                                 if (tokenList->nextToken->subToken == NULL) {
                                     //sub token without subtoken...
                                     throwWarn("hit sub token without sub token!\n");
-                                    *current = ObjectCall(tokenList->name, TokenConstructNumber(0));
+                                    *current = ObjectCall(tokenList->name, DataToken(0));
                                     break;
                                 } else {
                                     resultNext = TokenEval(tokenList->nextToken->subToken);
@@ -278,15 +270,15 @@ DataToken TokenEval(DataToken* tokenList) {
                 *current = DataToken(tokenList->name);
                 break;
             case TOKEN_ARGSEPERATOR:
-                current->subToken = (DataToken*) malloc(sizeof(DataToken));
-                *current->subToken = TokenConstructNumber(0);
+                current->subToken = new DataToken(0);
                 current = current->subToken;
                 break;
             case TOKEN_NONE:
+                //ignore, token none will be inserted by the tokenizer as the last token due to implimentation
+                break;
             case TOKEN_UNKNOWN:
             default:
-                //if first token is a NONE token just return 0 and throw an error for good measure
-                throwWarn("hit TOKEN_UNKNOWN or TOKEN_NONE!\n");
+                throwWarn("hit TOKEN_UNKNOWN or not defined token type!\n");
                 break;
         }
     
@@ -357,7 +349,7 @@ DataToken* TokenizeString(std::string input) {
                 throwWarn("Error: unclosed bracket '('!\n");
                 delete rootToken;
                 rootToken = new DataToken;
-                *rootToken = TokenConstructNumber(0);
+                *rootToken = DataToken(0);
                 return rootToken;
             }
             it = subIt;
@@ -393,7 +385,7 @@ DataToken* TokenizeString(std::string input) {
                 throwWarn("String has not been closed off!\n");
                 delete rootToken;
                 rootToken = new DataToken;
-                *rootToken = TokenConstructNumber(0);
+                *rootToken = DataToken(0);
                 return rootToken;
             }
         } else
@@ -455,6 +447,11 @@ DataToken* TokenizeString(std::string input) {
                     break;
                 case '%':
                     *currentToken = DataToken(OP_MODULUS);
+                    currentToken->nextToken = new DataToken();
+                    currentToken = currentToken->nextToken;
+                    break;
+                case ';':
+                    currentToken->type = TOKEN_ARGSEPERATOR;
                     currentToken->nextToken = new DataToken();
                     currentToken = currentToken->nextToken;
                     break;

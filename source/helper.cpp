@@ -66,7 +66,7 @@ void tokenDebug(DataToken* token, int indent) {
                 std::cout << "(TOKEN_TEXT) \"" << tk->name << "\"\n";
                 break;
             case TOKEN_ARGSEPERATOR:
-                std::cout << "###### (TOKEN_ARGSEPERATOR) ######";
+                std::cout << "###### (TOKEN_ARGSEPERATOR) ######\n";
                 break;
             case TOKEN_UNKNOWN:
                 std::cout << "(TOKEN_UNKNOWN)\n";
@@ -74,6 +74,13 @@ void tokenDebug(DataToken* token, int indent) {
             default:
                 std::cout << "[!TYPE OUT OF RANGE!]\n";
                 break;
+        }
+        if (tk->subToken) {
+            for (DataToken* st = tk->subToken; st != NULL; st = st->subToken) {
+                for (int i = 0; i < indent; i++) std::cout << "\t";
+                std::cout << "-> ";
+                tokenDebug(st, 0);
+            }
         }
     }
 }

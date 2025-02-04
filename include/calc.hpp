@@ -3,10 +3,6 @@
 
 #include "types.hpp"
 
-DataToken TokenConstructNumber(double value);
-void TokenFree(DataToken* token);
-void TokenFree(DataToken rootToken);
-
 DataToken ObjectGet(std::string name);
 void ObjectSet(std::string name, double val);
 void ObjectSet(std::string name, char* text);

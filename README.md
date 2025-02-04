@@ -13,7 +13,7 @@ But apart from being able to add and subtract numbers WTCC aims to have a bit mo
 
 ### Features?
 
-- [ ] Parsing of equations and syntax
+- [x] Parsing of equations and syntax
 - [x] Basic arithmatic
 - [x] Function calls *(no function definition yet)*
 - [x] Variables *(no variable definition yet)*
@@ -26,22 +26,17 @@ When complete <sup>*enough*</sup> WTCC should be able to run a propper program. 
 
 ## How do i compile it?
 
-1. run `make`
-2. `./wtcc`
-3. ???
-4. **profit**
+You can either run `make` directly to build the project or run `buildLinux.sh`.
+
+The output binary is `wtcc`.
 
 ### I run Windows, how do i compile it?
 
-To compile this code under Windows you need MSYS2 with gcc and g++
+To compile this code under Windows you need MSYS2 with gcc and g++.
 
-Then just:
+Similar to linux you can either run `make EXECUTABLE=wtcc.exe` or run `buildWindows.bat`.
 
-1. open a MSYS2 command prompt and enter the project directory 
-2. run `make EXECUTABLE=wtcc.exe`
-3. `wtcc.exe`
-4. ???
-5. **profit** <sup>but slightly less</sup>
+The output binary is `wtcc.exe`.
 
 ## License and warranty?
 

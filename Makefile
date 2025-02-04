@@ -13,8 +13,10 @@ EXECUTABLE := wtcc
 # Compiler settings
 CC := gcc
 CXX := g++
-CFLAGS := -I$(INCLUDE_DIR)
-CXXFLAGS := -I$(INCLUDE_DIR)
+CWARNFLAGS := -Wall -Wextra -Werror -Wpedantic -Wshadow -Wconversion -Wsign-conversion -Wunused -Wuninitialized -Wmaybe-uninitialized -Wformat=2 -Wswitch-enum -Wmissing-prototypes -Wmissing-declarations -Wmissing-field-initializers -Wstrict-aliasing -Wduplicated-cond -Wlogical-op
+CXXWARNFLAGS := -Wall -Wextra -Werror -Wpedantic -Wshadow -Wconversion -Wsign-conversion -Wunused -Wuninitialized -Wmaybe-uninitialized -Wformat=2 -Wswitch-enum -Wnon-virtual-dtor -Woverloaded-virtual -Wdeprecated-declarations
+CFLAGS := -I$(INCLUDE_DIR) -O3 $(CWARNFLAGS)
+CXXFLAGS := -I$(INCLUDE_DIR) -O3 $(CXXWARNFLAGS) -std=c++20
 LDFLAGS := -lm
 
 # Default target
