@@ -3,18 +3,6 @@
 
 #include <string>
 
-enum TokenType {
-    TOKEN_NONE = 0,
-    TOKEN_NUMBER,
-    TOKEN_OPERATOR,
-    TOKEN_SUBTOKEN,
-    TOKEN_VARIABLE,
-    TOKEN_FUNCTION,
-    TOKEN_TEXT,
-    TOKEN_ARGSEPERATOR,
-    TOKEN_UNKNOWN
-};
-
 enum OperatorType {
     OP_NONE = 0,
     OP_ADDITION,
@@ -25,31 +13,39 @@ enum OperatorType {
     OP_MODULUS,
     OP_UNKNOWN
 };
-
-struct DataToken {
-    TokenType type; //type of token
-    DataToken* nextToken; //pointer to next token in linked list
-    double value; //value of token when number token
-    OperatorType operatorType; //type of operator when operator token
-    DataToken* subToken; //pointer to sub token list of subtoken
-    char* name; //name of variable, function or text value when variable, function or text token token
+enum TokenType {
+    TOKEN_NONE = 0,
+    TOKEN_NUMBER,
+    TOKEN_OPERATOR,
+    TOKEN_SUBTOKEN,
+    TOKEN_OBJECT,
+    TOKEN_TEXT,
+    TOKEN_ARGSEPERATOR,
+    TOKEN_UNKNOWN
 };
 
-struct DataVariable {
-    std::string name; //name of variable
-    double value; //value of variable
-};
+class DataToken {
+    public:
+        DataToken();
+        DataToken(double);
+        DataToken(std::string, bool isObject = false);
+        DataToken(OperatorType);
+        ~DataToken();
 
-struct DataFunction {
-    std::string name; //name of function
-    DataToken (*function)(DataToken data); //pointer to function to be executet
+        TokenType type; //type of token
+        DataToken* nextToken; //pointer to next token in linked list
+        double value; //value of token when number token
+        OperatorType operatorType; //type of operator when operator token
+        DataToken* subToken; //pointer to sub token list of subtoken
+        std::string name; //name of variable, function or text value when variable, function or text token token
 };
 
 enum ObjectType {
     OBJ_NONE = 0,
     OBJ_NUMBER,
     OBJ_TEXT,
-    OBJ_FUNCTION
+    OBJ_FUNCTION,
+    OBJ_CFUNCTION
 };
 
 struct DataObject {
@@ -58,7 +54,8 @@ struct DataObject {
     union {
         double value; //value for number type
         char* text; //text for text type
-        DataToken (*function)(DataToken data); //function for function type
+        DataToken (*cFunction)(DataToken data); //function for function type
+        DataToken* function;
     };
 };
 

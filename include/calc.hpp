@@ -14,7 +14,7 @@ void ObjectSet(std::string name, DataToken (*function)(DataToken));
 ObjectType ObjectGetType(std::string name);
 DataToken ObjectCall(std::string name, DataToken data);
 
-DataToken TokenCalc(DataToken* tokenList);
-
+DataToken TokenEval(DataToken* tokenList);
+DataToken* TokenizeString(std::string input);
 
 #endif

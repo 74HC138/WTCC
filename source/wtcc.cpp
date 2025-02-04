@@ -25,29 +25,19 @@ DataToken testFunction(DataToken data) {
 }
 
 int main() {
-    ObjectSet("test", &testFunction);
-    ObjectSet("varA", 42);
-
-    DataToken test[] = {
-        {TOKEN_FUNCTION, &test[1], 0, OP_NONE, NULL, "test"},
-        {TOKEN_SUBTOKEN, NULL, 0, OP_NONE, &test[2], NULL},
-            {TOKEN_NUMBER, &test[3], 42, OP_NONE, NULL, NULL},
-            {TOKEN_ARGSEPERATOR, &test[4], 0, OP_NONE, NULL, NULL},
-            {TOKEN_TEXT, &test[5], 0, OP_NONE, NULL, "Die Antwort auf alles"},
-            {TOKEN_ARGSEPERATOR, &test[6], 0, OP_NONE, NULL, NULL},
-            {TOKEN_VARIABLE, NULL, 0, OP_NONE, NULL, "varA"}
-    };
+    std::cout << "testing string tokenizer.\nEnter string: ";
+    std::string string;
+    std::getline(std::cin, string);
     
-    std::cout << "Testing function call, variables and argument seperator\n";
-    DataToken result = TokenCalc(test);
+    DataToken* token = TokenizeString(string);
 
-    if (result.type == TOKEN_NUMBER) {
-        std::cout << "result is " << result.value << "\n";
-    } else {
-        std::cout << "this has not worked... the result is not a number!\n";
-    }
+    tokenDebug(token);
 
-    TokenFree(result);
+    std::cout << "Evaluating token:\n";
 
+    DataToken output = TokenEval(token);
+
+    tokenDebug(&output);
+    
     return 0;
 }

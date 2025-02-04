@@ -13,8 +13,8 @@ EXECUTABLE := wtcc
 # Compiler settings
 CC := gcc
 CXX := g++
-CFLAGS := -I$(INCLUDE_DIR) -O3
-CXXFLAGS := -I$(INCLUDE_DIR) -O3
+CFLAGS := -I$(INCLUDE_DIR)
+CXXFLAGS := -I$(INCLUDE_DIR)
 LDFLAGS := -lm
 
 # Default target
