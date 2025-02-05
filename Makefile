@@ -38,5 +38,5 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 
 # Clean the build directory
 clean:
-	rm -rf $(BUILD_DIR) $(EXECUTABLE)
+	rm -rf $(BUILD_DIR) $(EXECUTABLE).*
 

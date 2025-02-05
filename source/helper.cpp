@@ -40,6 +40,9 @@ void tokenDebug(DataToken* token, int indent) {
                     case OP_MODULUS:
                         std::cout << "%\n";
                         break;
+                    case OP_ASSIGN:
+                        std::cout << "=\n";
+                        break;
                     case OP_UNKNOWN:
                         std::cout << "[OP_UNKNOWN]\n";
                         break;
@@ -75,11 +78,13 @@ void tokenDebug(DataToken* token, int indent) {
                 std::cout << "[!TYPE OUT OF RANGE!]\n";
                 break;
         }
-        if (tk->subToken) {
+        if (tk->subToken && type != TOKEN_SUBTOKEN) {
             for (DataToken* st = tk->subToken; st != NULL; st = st->subToken) {
                 for (int i = 0; i < indent; i++) std::cout << "\t";
                 std::cout << "-> ";
-                tokenDebug(st, 0);
+                DataToken tmp = *st;
+                tmp.subToken = NULL;
+                tokenDebug(&tmp, 0);
             }
         }
     }

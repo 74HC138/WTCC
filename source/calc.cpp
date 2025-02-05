@@ -7,13 +7,31 @@
 #include "malloc.h"
 #include "math.h"
 
+//structs and enums for operator und token functionality
+struct OperatorFunction {
+    OperatorType type;
+    int (*function)(DataToken* dest, DataToken* src);
+};
+enum TokenHandlerReturn {
+    TH_CONTINUE = 0,
+    TH_EXIT,
+    TH_SKIP,
+    TH_ERROR
+};
+struct TokenHandlerType {
+    TokenType type;
+    TokenHandlerReturn (*function)(DataToken** currentResult, DataToken* token);
+};
+
+//object storage
 std::vector<DataObject> objectStorage;
-
-void TokenAppendSubtoken(DataToken* base, DataToken* ext) {
-    while (base->subToken != NULL) base = base->subToken;
-    base->subToken = ext;
+//object system
+std::vector<DataObject>::iterator ObjectGetRawIterator() {
+    return objectStorage.begin();
 }
-
+std::vector<DataObject>::iterator ObjectGetRawEnditerator() {
+    return objectStorage.end();
+}
 DataToken ObjectGet(std::string name) {
     for (auto it = objectStorage.begin(); it != objectStorage.end(); it++) {
         if (name.compare(it->name) == 0) {
@@ -56,6 +74,7 @@ void ObjectSet(std::string name, char* text) {
     for (auto it = objectStorage.begin(); it != objectStorage.end(); it++) {
         if (name.compare(it->name) == 0) {
             if (it->type == OBJ_TEXT) {
+                delete it->text;
                 it->text = text;
                 return;
             }
@@ -65,6 +84,11 @@ void ObjectSet(std::string name, char* text) {
     }
     DataObject obj = {.name = name, .type = OBJ_TEXT, .text = text};
     objectStorage.push_back(obj);
+}
+void ObjectSet(std::string name, std::string text) {
+    char* tmp = (char*) malloc(text.length() + 1);
+    text.copy(tmp, text.length());
+    ObjectSet(name, tmp);
 }
 void ObjectSet(std::string name, DataToken (*function)(DataToken)) {
     for (auto it = objectStorage.begin(); it != objectStorage.end(); it++) {
@@ -106,7 +130,7 @@ DataToken ObjectCall(std::string name, DataToken data) {
             if (it->type == OBJ_CFUNCTION) {
                 return it->cFunction(data);
             } else if (it->type == OBJ_FUNCTION) {
-                return TokenEval(it->function); //wtcc functions do not support parameters for now. TODO
+                return *TokenEval(it->function); //wtcc functions do not support parameters for now. TODO
             } else {
                 throwWarn("Attempted to call " + name + " a non function\n");
                 return DataToken(0);
@@ -116,189 +140,299 @@ DataToken ObjectCall(std::string name, DataToken data) {
     throwWarn("Object " + name + " does not exist\n");
     return DataToken(0);
 }
+void ObjectDelete(std::string name) {
+    for (auto it = objectStorage.begin(); it != objectStorage.end(); it++) {
+        if (name.compare(it->name) == 0) {
+            objectStorage.erase(it);
+            return;
+        }
+    }
+}
 
+//Token evaluation system
+const std::vector<OperatorFunction> OpFunctions = {
+    {OP_NONE, [](DataToken* dest, DataToken* src) {
+        //do nothing and return.... having done nothing....
+        dest = dest;
+        src = src;
+        return 0;
+    }},
+    {OP_ADDITION, [](DataToken* dest, DataToken* src) {
+        if (dest->type == TOKEN_NUMBER) {
+            if (src->type == TOKEN_NUMBER) {
+                dest->value += src->value;
+                return 0;
+            } else if (src->type == TOKEN_TEXT) {
+                dest->value += std::stod(src->name);
+                return 0;
+            } else {
+                //something that is not number and not text.... still bad
+                throwWarn("unsuported source data type for addition!\n");
+                return 1;
+            }
+        } else if (dest->type == TOKEN_TEXT) {
+            if (src->type == TOKEN_NUMBER) {
+                dest->name += std::to_string(src->value);
+                return 0;
+            } else if (src->type == TOKEN_TEXT) {
+                dest->name += src->name;
+                return 0;
+            } else {
+                //still something that is not a number nor text.... still very bad
+                throwWarn("unsuported source data type for addition!\n");
+                return 1;
+            }
+        } else {
+            //something that is not number and not text.... bad
+            throwWarn("unsuported destination data type for addition!\n");
+            return 1;
+        }
+    }},
+    {OP_SUBTRACTION, [](DataToken* dest, DataToken* src) {
+        double val = 0;
+        if (src->type == TOKEN_NUMBER) {
+            val = src->value;
+        } else {
+            throwWarn("unsported source type for subtraction!\n");
+            return 1;
+        }
+        if (dest->type == TOKEN_NUMBER) {
+            dest->value -= val;
+        } else if (dest->type == TOKEN_TEXT) {
+            int len = (int) val;
+            if (len >= (int) dest->name.length()) {
+                dest->name = "";
+            } else {
+                if (val > 0) dest->name.erase(dest->name.end() - len, dest->name.end());
+            }
+        } else {
+            //sorce data is not string or number
+            throwWarn("unsuported destination type for subtraction\n");
+            return 1;
+        }
+        return 0;
+    }},
+    {OP_MULTIPLICATION, [](DataToken* dest, DataToken* src) {
+        double val = 0;
+        if (src->type == TOKEN_NUMBER) {
+            val = src->value;
+        } else {
+            throwWarn("unsporte source type for multiplication!\n");
+            return 1;
+        }
+        if (dest->type == TOKEN_NUMBER) {
+            dest->value *= val;
+        } else if (dest->type == TOKEN_TEXT) {
+            std::string tmp = "";
+            for (int i = 0; i < val; i++) tmp += dest->name;
+            dest->name = tmp;
+        } else {
+            throwWarn("unsported destination type for multiplication!\n");
+            return 1;
+        }
+        return 0;
+    }},
+    {OP_DIVISION, [](DataToken* dest, DataToken* src) {
+        if (src->type != TOKEN_NUMBER) {
+            throwWarn("unsuported source type for division!\n");
+            return 1;
+        }
+        if (dest->type != TOKEN_NUMBER) {
+            throwWarn("unsuported destination type for division!\n");
+            return 1;
+        }
+        if (src->value == 0) {
+            throwWarn("Division by 0!\n");
+            dest->value = 0;
+            return 1;
+        }
+        dest->value /= src->value;
+        return 0;
+    }},
+    {OP_POWER, [](DataToken* dest, DataToken* src) {
+        if (src->type != TOKEN_NUMBER) {
+            throwWarn("unsuported source type for power!\n");
+            return 1;
+        }
+        if (dest->type != TOKEN_NUMBER) {
+            throwWarn("unsuported destination type for power!\n");
+            return 1;
+        }
+        dest->value = pow(dest->value, src->value);
+        return 0;
+    }},
+    {OP_MODULUS, [](DataToken* dest, DataToken* src) {
+        if (src->type != TOKEN_NUMBER) {
+            throwWarn("unsuported source type for modulus!\n");
+            return 1;
+        }
+        if (dest->type != TOKEN_NUMBER) {
+            throwWarn("unsuported destination type for modulus!\n");
+            return 1;
+        }
+        dest->value = fmod(dest->value, src->value);
+        return 0;
+    }},
+    {OP_ASSIGN, [](DataToken* dest, DataToken* src) {
+        if (dest->type != TOKEN_TEXT && dest->type != TOKEN_OBJECT) {
+            throwWarn("cant assign to this type!\n");
+            return 1;
+        }
+        if (src->type == TOKEN_NUMBER) {
+            ObjectSet(dest->name, src->value);
+        } else if (src->type == TOKEN_TEXT) {
+            ObjectSet(dest->name, src->name);
+        } else {
+            throwWarn("cant assign this to a variable!\n");
+            return 1;
+        }
+        return 0;
+    }},
+    {OP_UNKNOWN, [](DataToken* dest, DataToken* src) {
+        //not good, should never be executet!
+        throwWarn("trying to execute unknown operator!\n");
+        dest = dest;
+        src = src;
+        return 1;
+    }}
+};
+const std::vector<TokenHandlerType> TokenHandler = {
+    {TOKEN_NONE, [](DataToken** currentResult, DataToken* token) {
+        currentResult = currentResult; //dummy
+        token = token; //dummy
+        return TH_CONTINUE;
+    }},
+    {TOKEN_NUMBER, [](DataToken** currentResult, DataToken* token) {
+        **currentResult = DataToken(token->value);
+        return TH_CONTINUE;
+    }},
+    {TOKEN_OPERATOR, [](DataToken** currentResult, DataToken* token) {
+        DataToken* resultNext = new DataToken(0);
+        if (token->nextToken) {
+            resultNext = TokenEval(token->nextToken);
+        }
+        for (auto it = OpFunctions.begin(); it != OpFunctions.end(); it++) {
+            if (it->type == token->operatorType) {
+                it->function(*currentResult, resultNext);
+                (*currentResult)->subToken = resultNext->subToken;
+                resultNext->subToken = NULL;
+                delete resultNext;
+                return TH_EXIT;
+            }
+        }
+        throwWarn("Operation not defined!\n");
+        (*currentResult)->subToken = resultNext->subToken;
+        resultNext->subToken = NULL;
+        delete resultNext;
+        return TH_EXIT;
+    }},
+    {TOKEN_SUBTOKEN, [](DataToken** currentResult, DataToken* token) {
+        DataToken* resultSub = new DataToken(0);
+        if (token->subToken) {
+            resultSub = TokenEval(token->subToken);
+            (**currentResult) = *resultSub;
+            for (; (*currentResult)->subToken != NULL; *currentResult = (*currentResult)->subToken);
+        } else {
+            throwWarn("Subtoken without subtoken!\n");
+        }
+        resultSub->subToken = NULL;
+        resultSub->nextToken = NULL;
+        delete resultSub;
+        return TH_CONTINUE;
+    }},
+    {TOKEN_OBJECT, [](DataToken** currentResult, DataToken* token) {
+        switch(ObjectGetType(token->name)) {
+            case OBJ_NONE:
+            default:
+                throwWarn("Object " + token->name + " is not defined!\n");
+                delete (*currentResult);
+                *currentResult = new DataToken(0);
+                break;
+            case OBJ_NUMBER:
+            case OBJ_TEXT:
+                **currentResult = ObjectGet(token->name);
+                break;
+            case OBJ_FUNCTION:
+            case OBJ_CFUNCTION:
+                if (token->nextToken == NULL) {
+                    **currentResult = ObjectCall(token->name, DataToken(0));
+                    for (; (*currentResult)->subToken != NULL; *currentResult = (*currentResult)->subToken);
+                    return TH_CONTINUE;
+                }
+                if (token->nextToken->type == TOKEN_SUBTOKEN) {
+                    DataToken* parameters = TokenEval(token->nextToken->subToken);
+                    **currentResult = ObjectCall(token->name, *parameters);
+                    delete parameters;
+                    for (; (*currentResult)->subToken != NULL; *currentResult = (*currentResult)->subToken);
+                    return TH_SKIP;
+
+                }
+                DataToken* parameter = TokenEval(token->nextToken);
+                DataToken* subTokens = parameter->subToken;
+                parameter->subToken = NULL;
+                **currentResult = ObjectCall(token->name, *parameter);
+                delete parameter;
+                for (; (*currentResult)->subToken != NULL; *currentResult = (*currentResult)->subToken);
+                (*currentResult)->subToken = subTokens;
+                subTokens = NULL;
+                return TH_EXIT;
+        }
+        return TH_CONTINUE;
+    }},
+    {TOKEN_TEXT, [](DataToken** currentResult, DataToken* token) {
+        **currentResult = DataToken(token->name);
+        return TH_CONTINUE;
+    }},
+    {TOKEN_ARGSEPERATOR, [](DataToken** currentResult, DataToken* token) {
+        token = token; //dummy
+        (*currentResult)->subToken = new DataToken(0);
+        *currentResult = (*currentResult)->subToken;
+        return TH_CONTINUE;
+    }},
+    {TOKEN_UNKNOWN, [](DataToken** currentResult, DataToken* token) {
+        throwWarn("Trying to executate unknown token type!\n");
+        currentResult = currentResult; //dummy
+        token = token; //dummy
+        return TH_CONTINUE;
+    }}
+};
 //Evaluates a token chain returning the result
 //If multiples results get returned then they get returned as a linked list atached to subToken
-DataToken TokenEval(DataToken* tokenList) {
-    DataToken rootResult = DataToken(0);
-    DataToken* current = &rootResult;
+DataToken* TokenEval(DataToken* tokenList) {
+    DataToken* rootResult = new DataToken(0);
+    DataToken* current = rootResult;
 
-    while (true) {
+    if (tokenList == NULL) return rootResult;
 
-        DataToken resultNext;
-        DataToken subToken;
-        DataToken* subTokenTmp;
-        switch (tokenList->type) {
-            case TOKEN_NUMBER:
-                *current = DataToken(tokenList->value);
-                break;
-            case TOKEN_OPERATOR:
-                resultNext = DataToken(0);
-                if (tokenList->nextToken == NULL) {
-                    //token list is cut off, assume 0 and throw warning
-                    throwWarn("Token list is cut off, assuming 0.\n");
-                } else {
-                    resultNext = TokenEval(tokenList->nextToken);
+    for (DataToken* tk = tokenList; tk != NULL; tk = tk->nextToken) {
+        bool exec = false;
+        for (auto it = TokenHandler.begin(); it != TokenHandler.end(); it++) {
+            if (it->type == tk->type) {
+                int retcode = it->function(&current, tk);
+                if (retcode == TH_EXIT) return rootResult;
+                if (retcode == TH_ERROR) throwWarn("Token Handler returned Error!\n");
+                if (retcode == TH_SKIP) {
+                    tk = tk->nextToken;
+                    if (tk == NULL) return rootResult;
                 }
-                if (resultNext.type != TOKEN_NUMBER) {
-                    if (resultNext.type == TOKEN_TEXT) {
-                        //seems like we hit text... store
-                        //since we have already ingested all tokens after this we just return
-                        *current = resultNext;
-                        return rootResult;
-                    } else {
-                        //we cant deal with anything but number... assume 0 and throw warning
-                        resultNext.~DataToken();
-                        resultNext = DataToken(0);
-                        throwWarn("unexpected result from TokenCalc, assuming 0!\n");
-                    }
-                }
-                if (current->type == TOKEN_TEXT) {
-                    //we cant do math on text, so we add the subtokens from our result to our token list and return
-                    current->subToken = resultNext.subToken;
-                    return rootResult;
-                }
-                switch (tokenList->operatorType) {
-                    case OP_ADDITION:
-                        current->value = current->value + resultNext.value;
-                        break;
-                    case OP_SUBTRACTION:
-                        current->value = current->value - resultNext.value;
-                        break;
-                    case OP_MULTIPLICATION:
-                        current->value = current->value * resultNext.value;
-                        break;
-                    case OP_DIVISION:
-                        if (resultNext.value == 0) {
-                            //zero division... cant have that!
-                            //throw warning and return 0
-                            throwWarn("Division by 0!\n");
-                            current->~DataToken();
-                            *current = DataToken(0);
-                            return rootResult;
-                        }
-                        current->value = current->value / resultNext.value;
-                        break;
-                    case OP_POWER:
-                        current->value = pow(current->value, resultNext.value);
-                        break;
-                    case OP_MODULUS:
-                        current->value = fmod(current->value, resultNext.value);
-                        break;
-                    case OP_NONE:
-                    case OP_UNKNOWN:
-                    default:
-                        //woops, hit undefined operator... thats a fail
-                        throwWarn("Hit undefined operator!\n");
-                        current->subToken = resultNext.subToken;
-                        return rootResult;
-                        break;
-                }
-                //return from here because all data is allready ingested
-                current->subToken = resultNext.subToken;
-                return rootResult;
-            case TOKEN_SUBTOKEN:
-                subToken = DataToken(0);
-                if (tokenList->subToken) {
-                    subToken = TokenEval(tokenList->subToken);
-                } else {
-                    //hit a sub token without a subtoken... strange
-                    throwWarn("Hit sub token without defined subtoken!\n");
-                }
-                if (subToken.type != TOKEN_NUMBER) {
-                    if (subToken.type == TOKEN_TEXT) {
-                        //got text from subtoken... propegate up
-                        *current = subToken;
-                        break;
-                    } else {
-                        //got something else... bad... assume 0 and contine
-                        throwWarn("unexpected result from subtoken!\n");
-                        *current = DataToken(0);
-                        current->subToken = subToken.subToken;
-                        break;
-                    }
-                }
-                *current = subToken;
+                exec = true;
                 break;
-
-            case TOKEN_OBJECT:
-                switch (ObjectGetType(tokenList->name)) {
-                    case OBJ_NONE:
-                    default:
-                        throwWarn("Object " + tokenList->name + "is not defined!");
-                        *current = DataToken(0);
-                        break;
-                    case OBJ_NUMBER:
-                    case OBJ_TEXT:
-                        *current = ObjectGet(tokenList->name);
-                        break;
-                    case OBJ_FUNCTION:
-                    case OBJ_CFUNCTION:
-                        //if we have more then one parameter for the function we need to check if the next token
-                        //is a subtoken, evaluate that and give all the parameters to the function
-                        if (tokenList->nextToken == NULL) {
-                            //we have no arguments for the function, call it with zero argument
-                            *current = ObjectCall(tokenList->name, DataToken(0));
-                            return rootResult;
-                        } else {
-                            if (tokenList->nextToken->type == TOKEN_SUBTOKEN) {
-                                if (tokenList->nextToken->subToken == NULL) {
-                                    //sub token without subtoken...
-                                    throwWarn("hit sub token without sub token!\n");
-                                    *current = ObjectCall(tokenList->name, DataToken(0));
-                                    break;
-                                } else {
-                                    resultNext = TokenEval(tokenList->nextToken->subToken);
-                                    *current = ObjectCall(tokenList->name, resultNext);
-                                }
-                                tokenList = tokenList->nextToken;
-                            } else {
-                                resultNext = TokenEval(tokenList->nextToken);
-                                subTokenTmp = resultNext.subToken;
-                                resultNext.subToken = NULL;
-                                *current = ObjectCall(tokenList->name, resultNext);
-                                TokenAppendSubtoken(current, subTokenTmp);
-                                return rootResult;
-                            }
-                        }
-                        break;
-
-                }
-                break;
-            case TOKEN_TEXT:
-                //if token is text we store that for now
-                *current = DataToken(tokenList->name);
-                break;
-            case TOKEN_ARGSEPERATOR:
-                current->subToken = new DataToken(0);
-                current = current->subToken;
-                break;
-            case TOKEN_NONE:
-                //ignore, token none will be inserted by the tokenizer as the last token due to implimentation
-                break;
-            case TOKEN_UNKNOWN:
-            default:
-                throwWarn("hit TOKEN_UNKNOWN or not defined token type!\n");
-                break;
+            }
         }
-    
-        if (tokenList->nextToken == NULL) break;
-        tokenList = tokenList->nextToken;
+        if (!exec) throwWarn("Could not execute token!\n");
     }
-
     return rootResult;
 }
 
+//String evaluation system
 bool charIsNumber(char c) {
     if ((c >= '0' && c <= '9') || (c == '.')) return true;
     return false;
 }
-
 bool charIsAlpha(char c) {
     if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_')) return true;
     return false;
 }
-
 DataToken* TokenizeString(std::string input) {
     DEBUG_PRINT("## Called TokenizeString");
     DataToken* rootToken = new DataToken();
@@ -397,12 +531,18 @@ DataToken* TokenizeString(std::string input) {
             for (; charIsNumber(*loopIt) == true; loopIt++);
             //number from it to loopIt
             std::string subStr = std::string(it, loopIt);
-            it = --loopIt;
+            it = loopIt - 1;
             double val = std::stod(subStr);
             *currentToken = DataToken(val);
             DEBUG_PRINT("curVal: " << currentToken->value);
             currentToken->nextToken = new DataToken();
             currentToken = currentToken->nextToken;
+            if (charIsAlpha(*loopIt) == true) {
+                //implied multiplication
+                *currentToken = DataToken(OP_MULTIPLICATION);
+                currentToken->nextToken = new DataToken();
+                currentToken = currentToken->nextToken;
+            }
         } else
         //handle object
         if (charIsAlpha(*it) == true) {
@@ -447,6 +587,11 @@ DataToken* TokenizeString(std::string input) {
                     break;
                 case '%':
                     *currentToken = DataToken(OP_MODULUS);
+                    currentToken->nextToken = new DataToken();
+                    currentToken = currentToken->nextToken;
+                    break;
+                case '=':
+                    *currentToken = DataToken(OP_ASSIGN);
                     currentToken->nextToken = new DataToken();
                     currentToken = currentToken->nextToken;
                     break;

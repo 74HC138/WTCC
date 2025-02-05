@@ -11,6 +11,7 @@ enum OperatorType {
     OP_DIVISION,
     OP_POWER,
     OP_MODULUS,
+    OP_ASSIGN,
     OP_UNKNOWN
 };
 enum TokenType {
