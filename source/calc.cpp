@@ -4,8 +4,8 @@
 #include "calc.hpp"
 #include "types.hpp"
 #include "helper.hpp"
-#include "malloc.h"
-#include "math.h"
+#include <math.h>
+
 
 //structs and enums for operator und token functionality
 struct OperatorFunction {
@@ -437,11 +437,13 @@ DataToken* TokenizeString(std::string input) {
     DEBUG_PRINT("## Called TokenizeString");
     DataToken* rootToken = new DataToken();
     DataToken* currentToken = rootToken;
+
     for (auto it = input.begin(); it != input.end(); it++) {
         //handle sub token
         if (*it == '(') {
             DEBUG_PRINT("## char belongs to subtoken");
             //entering subtoken
+
             int subLevel = 0;
             auto subIt = it;
             bool skip = false;
@@ -492,6 +494,7 @@ DataToken* TokenizeString(std::string input) {
         if (*it == '"') {
             DEBUG_PRINT("## char belongs to string");
             //entering string
+
             auto endIt = it + 1;
             bool skip = false;
             for (; endIt != input.end(); endIt++) {
@@ -527,6 +530,7 @@ DataToken* TokenizeString(std::string input) {
         if (charIsNumber(*it) == true) {
             DEBUG_PRINT("## char belongs to number");
             //handle a number
+
             auto loopIt = it;
             for (; charIsNumber(*loopIt) == true; loopIt++);
             //number from it to loopIt
@@ -548,6 +552,7 @@ DataToken* TokenizeString(std::string input) {
         if (charIsAlpha(*it) == true) {
             DEBUG_PRINT("## char belongs to object");
             //handle text object
+
             auto loopIt = it;
             for (; (charIsAlpha(*loopIt) == true) || (charIsNumber(*loopIt) == true); loopIt++);
             //text from beginIt to loopIt
@@ -559,6 +564,7 @@ DataToken* TokenizeString(std::string input) {
         } else {
             //handle operator
             DEBUG_PRINT("## char might be operator");
+
             switch (*it) {
                 case '+':
                     *currentToken = DataToken(OP_ADDITION);

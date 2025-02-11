@@ -5,8 +5,9 @@
 #include "types.hpp"
 #include "helper.hpp"
 #include "calc.hpp"
+#include "textInput.hpp"
 
-#define VERSION "v0.2"
+#define VERSION "v0.3"
 
 struct ConstFn {
     std::string name;
@@ -83,8 +84,15 @@ const std::vector<ConstFn> constantFunctions = {
         std::cout << "\n----------------------------------\n";
         std::cout << "WTCC help:\n";
         std::cout << "WTCC tokenizes and evaluates a math function. It can do basic arithmatic, call functions and assign and use variables.\n";
-        std::cout << "TODO proper help text\n";
-        std::cout << "Use  \"list\" to list all objects in the object table\n";
+        std::cout << "Recognised operators are + (Add/String Add), - (Subtract/String Subtract), * (Mutiply/String Multiply), / (Divide), ^ (Power) and % (Modulus).\n";
+        std::cout << "Numbers follow \"integer\".\"decimal\" and strings are \"defined like this\".\n";
+        std::cout << "To call functions you can either call without brackets \"sin 1\" or with \"sin(1)\". Multiple arguments can only be used with brackets.\n";
+        std::cout << "You can return multiple with the argument seperator \";\" like this \"1;2;3;4\". This can be used to call functions with multiple arguments.\n";
+        std::cout << "To define variables assign something with \"=\" to the string name of the varible like this \" \"var\" = 42 \".\n";
+        std::cout << "To delete a variable use delete with the string name of the variable like this \" delete \"val\" \"\n";
+        std::cout << "To list all defined objects use \"list\". Variables are prefixed with \"var\" and functions with \"fn\".\n";
+        std::cout << "The parser recognises implied multiplications and with the predefined metric constants you can use numbers like \"1k\" for 1000.\n";
+        std::cout << "To exit use \"exit\". The first parameter to exit will be used as the exit code.\n";
         std::cout << "----------------------------------\n";
         return DataToken(0);
     }},
@@ -183,9 +191,7 @@ int main() {
     std::cout << "Use help to get started.\n";
 
     while (42) {
-        std::cout << "-> ";
-        std::string input;
-        std::getline(std::cin, input);
+        std::string input = getInput();
         
         DataToken* tokenized = TokenizeString(input);
         #ifdef DEBUG
