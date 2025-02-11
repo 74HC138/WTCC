@@ -23,9 +23,9 @@ struct TokenHandlerType {
     TokenHandlerReturn (*function)(DataToken** currentResult, DataToken* token);
 };
 
-//object storage
+//object storage for variables and functions
 std::vector<DataObject> objectStorage;
-//object system
+//functions for the object system to set, retrieve and delete functions
 std::vector<DataObject>::iterator ObjectGetRawIterator() {
     return objectStorage.begin();
 }
@@ -149,7 +149,8 @@ void ObjectDelete(std::string name) {
     }
 }
 
-//Token evaluation system
+
+//Operator evaluation functions, externalized from TokenEval for cleanlieness
 const std::vector<OperatorFunction> OpFunctions = {
     {OP_NONE, [](DataToken* dest, DataToken* src) {
         //do nothing and return.... having done nothing....
@@ -296,6 +297,7 @@ const std::vector<OperatorFunction> OpFunctions = {
         return 1;
     }}
 };
+//Token handler functions, externalized from TokenEval for cleanlieness
 const std::vector<TokenHandlerType> TokenHandler = {
     {TOKEN_NONE, [](DataToken** currentResult, DataToken* token) {
         currentResult = currentResult; //dummy
@@ -424,7 +426,7 @@ DataToken* TokenEval(DataToken* tokenList) {
     return rootResult;
 }
 
-//String evaluation system
+//String tokenization system
 bool charIsNumber(char c) {
     if ((c >= '0' && c <= '9') || (c == '.')) return true;
     return false;
@@ -433,6 +435,7 @@ bool charIsAlpha(char c) {
     if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_')) return true;
     return false;
 }
+//Takes a string and tokenizes it returning a linked list of tokens to execute
 DataToken* TokenizeString(std::string input) {
     DEBUG_PRINT("## Called TokenizeString");
     DataToken* rootToken = new DataToken();

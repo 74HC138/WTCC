@@ -13,6 +13,7 @@ struct ConstFn {
     std::string name;
     DataToken (*function)(DataToken);
 };
+//Predined functions available within WTCC
 const std::vector<ConstFn> constantFunctions = {
     //trigonometric functions
     {"sin", [](DataToken tk) {
@@ -161,6 +162,7 @@ struct ConstN {
     std::string name;
     double n;
 };
+//predefined constants within WTCC
 const std::vector<ConstN> constantValue = {
     {"e", M_E},
     {"pi", M_PI},
@@ -172,6 +174,7 @@ const std::vector<ConstN> constantValue = {
     {"n", 1e-9}
 };
 
+//initializes object storrage with predfined functions
 void populateObjects() {
     for (auto it = constantFunctions.begin(); it != constantFunctions.end(); it++) {
         ObjectSet(it->name, it->function);
@@ -179,7 +182,6 @@ void populateObjects() {
     for (auto it = constantValue.begin(); it != constantValue.end(); it++) {
         ObjectSet(it->name, it->n);
     }
-    
 }
 
 int main() {
@@ -191,18 +193,22 @@ int main() {
     std::cout << "Use help to get started.\n";
 
     while (42) {
+        //get user input
         std::string input = getInput();
         
+        //tokenize it
         DataToken* tokenized = TokenizeString(input);
         #ifdef DEBUG
             tokenDebug(tokenized);
         #endif
 
+        //evaluate it
         DataToken* output = TokenEval(tokenized);
         #ifdef DEBUG
             tokenDebug(output);
         #endif
 
+        //and print out the result
         if (output->subToken) {
             std::cout << "= {";
             bool addPrefix = false;
